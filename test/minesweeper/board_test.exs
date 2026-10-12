@@ -155,4 +155,35 @@ defmodule Minesweeper.BoardTest do
       assert revealed_positions(board) == MapSet.new([{0, 0}])
     end
   end
+
+  describe "cleared?/1" do
+    # 盤面: 地雷が {0, 0} にだけある 3×1 の盤面
+    #   y=0: M 1 0
+    setup do
+      %{board: Board.from_mines(3, 1, [{0, 0}])}
+    end
+
+    test "最初はクリアしていない", %{board: board} do
+      refute Board.cleared?(board)
+    end
+
+    test "地雷以外をすべて開くとクリア", %{board: board} do
+      # {2, 0} は周囲の地雷が 0 なので、{1, 0} も連鎖して開きます。
+      board = Board.reveal(board, {2, 0})
+
+      assert Board.cleared?(board)
+    end
+
+    test "地雷以外に閉じたマスが残っていればクリアではない", %{board: board} do
+      board = Board.reveal(board, {1, 0})
+
+      refute Board.cleared?(board)
+    end
+
+    test "地雷を開いても、他のマスが残っていればクリアではない", %{board: board} do
+      board = Board.reveal(board, {0, 0})
+
+      refute Board.cleared?(board)
+    end
+  end
 end

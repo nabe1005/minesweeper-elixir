@@ -121,16 +121,28 @@ defmodule Minesweeper.Board do
     # |> then(fn cells -> %{board | cells: cells} end)
   end
 
-  # その座標に地雷があれば true を返します。
+  @doc """
+  座標 `position` に地雷があれば true を返します。盤面の外の座標なら false です。
+  """
+  # Game モジュールからも使うので、def（公開関数）にしています。
   # 盤面の外（例: {-1, 0}）を渡すと Map.get は nil を返すので、その場合は false にします。
   #
   # `case` は値をパターンで振り分けます（Dart 3 の switch 式に近いものです）。
   # 上から順に照合し、最初に一致した節が実行されます。
-  defp mine?(board, position) do
+  def mine?(board, position) do
     case Map.get(board.cells, position) do
       nil -> false
       cell -> cell.mine
     end
+  end
+
+  @doc """
+  地雷以外のマスがすべて開いていれば true を返します（＝クリア）。
+  """
+  # Elixir では、true / false を返す関数の名前に `?` を付ける習慣があります（例: Enum.empty?/1）。
+  def cleared?(board) do
+    # Map を Enum の関数に渡すと、要素は {キー, 値} のタプルになるので、引数でパターンマッチして受け取ります。
+    Enum.all?(board.cells, fn {_pos, cell} -> cell.mine or cell.state == :revealed end)
   end
 
   # 座標 {x, y} の周囲8マスの座標をリストで返します（盤面の外の座標も含んでかまいません）。
