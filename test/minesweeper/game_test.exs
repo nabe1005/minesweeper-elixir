@@ -53,4 +53,19 @@ defmodule Minesweeper.GameTest do
 
     assert Game.reveal(game, {3, 3}) == {:error, :game_finished}
   end
+
+  describe "toggle_flag/2" do
+    test "プレイ中なら旗を立てられ、状態はプレイ中のまま", %{game: game} do
+      {:ok, game} = Game.toggle_flag(game, {3, 3})
+
+      assert game.board.cells[{3, 3}].state == :flagged
+      assert game.status == :playing
+    end
+
+    test "終わったゲームでは旗を立てられない", %{game: game} do
+      {:ok, game} = Game.reveal(game, {3, 3})
+
+      assert Game.toggle_flag(game, {0, 0}) == {:error, :game_finished}
+    end
+  end
 end

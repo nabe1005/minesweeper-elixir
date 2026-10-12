@@ -19,6 +19,18 @@ defmodule Minesweeper.RendererTest do
       assert Renderer.cell_symbol(board, {0, 0}) == "#"
     end
 
+    test "旗を立てたマスは F", %{board: board} do
+      board = Board.toggle_flag(board, {1, 0})
+
+      assert Renderer.cell_symbol(board, {1, 0}) == "F"
+    end
+
+    test "旗を立てた地雷も F（地雷だとばれない）", %{board: board} do
+      board = Board.toggle_flag(board, {0, 0})
+
+      assert Renderer.cell_symbol(board, {0, 0}) == "F"
+    end
+
     test "開いた地雷は *", %{board: board} do
       board = Board.reveal(board, {0, 0})
 

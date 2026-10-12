@@ -186,4 +186,61 @@ defmodule Minesweeper.BoardTest do
       refute Board.cleared?(board)
     end
   end
+
+  describe "toggle_flag/2" do
+    setup do
+      %{board: Board.from_mines(3, 3, [{0, 0}])}
+    end
+
+    test "閉じているマスに旗を立てる", %{board: board} do
+      board = Board.toggle_flag(board, {1, 1})
+
+      assert board.cells[{1, 1}].state == :flagged
+    end
+
+    test "もう一度呼ぶと旗が外れる", %{board: board} do
+      board = board |> Board.toggle_flag({1, 1}) |> Board.toggle_flag({1, 1})
+
+      assert board.cells[{1, 1}].state == :hidden
+    end
+
+    test "地雷のマスにも旗を立てられる", %{board: board} do
+      board = Board.toggle_flag(board, {0, 0})
+
+      assert board.cells[{0, 0}] == %{mine: true, state: :flagged}
+    end
+
+    test "開いているマスには旗を立てられない", %{board: board} do
+      board = Board.reveal(board, {1, 1})
+
+      assert Board.toggle_flag(board, {1, 1}) == board
+    end
+
+    test "盤面の外を指定しても何も起きない", %{board: board} do
+      assert Board.toggle_flag(board, {9, 9}) == board
+    end
+  end
+
+  describe "reveal/2 と旗" do
+    test "旗を立てたマスは開かない" do
+      board = Board.from_mines(3, 3, [{0, 0}]) |> Board.toggle_flag({1, 1})
+
+      assert Board.reveal(board, {1, 1}) == board
+    end
+
+    # 盤面（M が地雷、F が旗）:
+    #   y=0: 0 0 0 0
+    #   y=1: 0 0 0 0
+    #   y=2: 0 0 1 1
+    #   y=3: F 0 1 M
+    test "連鎖で開くときも、旗を立てたマスは開かない" do
+      board =
+        Board.from_mines(4, 4, [{3, 3}])
+        |> Board.toggle_flag({0, 3})
+        |> Board.reveal({0, 0})
+
+      assert board.cells[{0, 3}].state == :flagged
+      assert Enum.count(board.cells, fn {_pos, cell} -> cell.state == :revealed end) == 14
+    end
+  end
 end

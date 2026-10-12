@@ -29,7 +29,7 @@ defmodule Minesweeper.Board do
   @type position :: {integer(), integer()}
 
   # セル。キーがアトムの Map は、値と同じ形で型を書けます。
-  @type cell :: %{mine: boolean(), state: :hidden | :revealed}
+  @type cell :: %{mine: boolean(), state: :hidden | :revealed | :flagged}
 
   # `t` は「このモジュールの構造体の型」に付ける、Elixir の慣習的な名前です。
   # 他のモジュールからは `Minesweeper.Board.t()` と書いて使います。
@@ -89,7 +89,8 @@ defmodule Minesweeper.Board do
   @doc """
   座標 `position` のマスを開いた、新しい盤面を返します。
 
-  - 盤面の外の座標や、すでに開いているマスを指定したときは、盤面をそのまま返します。
+  - 盤面の外の座標や、すでに開いているマス・旗を立てたマスを指定したときは、盤面をそのまま返します。
+    連鎖で周りから開こうとしたときも、旗を立てたマスは開きません。
   - 地雷のマスも開きます（勝ち負けの判定は `Minesweeper.Game` が行います）。
   - 開いたマスが地雷ではなく、周囲の地雷が 0 個なら、周囲8マスも自動で開きます。
     開いたマスがまた 0 なら、さらにその周りへと連鎖していきます。
@@ -110,8 +111,11 @@ defmodule Minesweeper.Board do
       %{state: :revealed} ->
         board
 
+      %{state: :flagged} ->
+        board
+
       cell ->
-        board = reveal_cell(board, position)
+        board = put_state(board, position, :revealed)
 
         # Elixir の `if` は「式」なので、値を返します（Dart の三項演算子 `? :` に近いものです）。
         # この if の結果が、そのまま reveal/2 の戻り値になります。
@@ -128,7 +132,7 @@ defmodule Minesweeper.Board do
   # reveal/2 → reveal_neighbors/2 → reveal/2 → ... と、関数が自分自身を（間接的に）呼んでいます。
   # これが「再帰」です。Elixir には while もミュータブルな変数もないので、繰り返しは再帰で書きます。
   #
-  # 無限に続かないのは、reveal/2 が「盤面の外」と「すでに開いているマス」では
+  # 無限に続かないのは、reveal/2 が「盤面の外」「すでに開いているマス」「旗を立てたマス」では
   # board をそのまま返して止まるからです（これを再帰の「終了条件」と呼びます）。
   defp reveal_neighbors(board, position) do
     # Enum.reduce(list, 初期値, fn 要素, 今までの結果 -> 新しい結果 end) は Dart の fold と同じです
@@ -136,21 +140,42 @@ defmodule Minesweeper.Board do
     Enum.reduce(neighbors(position), board, fn neighbor, acc -> reveal(acc, neighbor) end)
   end
 
-  # position のセルの state を :revealed にした、新しい盤面を返します。
-  # （position が盤面の中にあり、まだ閉じていることは reveal/2 で確認済みです）
-  defp reveal_cell(board, position) do
-    # 内側から順に作り直します: セルを更新 → cells を更新 → board の cells を差し替え。
-    # `%{map | key: value}` は「key だけ value にしたコピー」を作ります（Dart の copyWith に近いもの）。
-    new_cells = Map.update!(board.cells, position, fn v -> %{v | state: :revealed} end)
-    %{board | cells: new_cells}
+  # position のセルの state を、引数の state に置き換えた新しい盤面を返します。
+  # reveal/2（開く）と toggle_flag/2（旗を立てる・外す）の両方から使います。
+  # position が盤面の中にあることは、呼び出し側で確認済みです（Map.update! は、キーがないとエラーになります）。
+  #
+  # 内側から順に作り直します: セルを更新 → cells を更新 → board の cells を差し替え。
+  # `%{board | cells: ...}` は関数ではないのでパイプで直接つなげず、
+  # `then/2`（値を受け取る無名関数を呼ぶだけの関数）で包んでいます。
+  defp put_state(board, position, state) do
+    board.cells
+    |> Map.update!(position, fn cell -> %{cell | state: state} end)
+    |> then(fn cells -> %{board | cells: cells} end)
+  end
 
-    # 参考までに
-    # `|>` は左の値を右の関数の「第1引数」に入れます。
-    # `%{board | cells: ...}` は関数ではないのでそのままではつなげず、
-    # `then/2`（値を受け取る無名関数を呼ぶだけの関数）で包んでいます。
-    # board.cells
-    # |> Map.update!(position, fn cell -> %{cell | state: :revealed} end)
-    # |> then(fn cells -> %{board | cells: cells} end)
+  @doc """
+  座標 `position` のマスの旗を立てる・外すを切り替えた、新しい盤面を返します。
+
+  - 閉じているマス → 旗を立てる（state を :flagged に）
+  - 旗のマス → 旗を外す（state を :hidden に戻す）
+  - 開いているマスや盤面の外 → 盤面をそのまま返す
+  """
+  # reveal/2 と同じく、case でセルの状態を振り分けています。
+  @spec toggle_flag(t(), position()) :: t()
+  def toggle_flag(board, position) do
+    case Map.get(board.cells, position) do
+      nil ->
+        board
+
+      %{state: :revealed} ->
+        board
+
+      %{state: :hidden} ->
+        put_state(board, position, :flagged)
+
+      %{state: :flagged} ->
+        put_state(board, position, :hidden)
+    end
   end
 
   @doc """

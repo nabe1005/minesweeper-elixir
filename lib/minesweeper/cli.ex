@@ -7,7 +7,7 @@ defmodule Minesweeper.CLI do
 
   alias Minesweeper.{Board, Game, Renderer}
 
-  @prompt "開く座標を「x y」の形で入力してください（q で終了）> "
+  @prompt "開く座標を「x y」の形で入力してください\n「f x y」でフラグを立てる・外すことができます\n（q で終了）> "
 
   @doc """
   ランダムな盤面でゲームを始めます。
@@ -61,16 +61,16 @@ defmodule Minesweeper.CLI do
     # `with` は「上から順にパターンマッチして、全部成功したら do の中を実行する」構文です。
     # 途中で一致しなかったら、その時点の値が else に渡されます。
     # {:ok, ...} を返す処理を何段もつなぐときに、case の入れ子を避けられます。
-    with {:ok, position} <- parse_position(input),
+    with {:ok, {action, position}} <- parse_command(input),
          true <- Map.has_key?(game.board.cells, position),
-         {:ok, game} <- Game.reveal(game, position) do
+         {:ok, game} <- apply_action(game, action, position) do
       play(game)
     else
       :quit ->
         IO.puts("終了します。")
 
       {:error, :invalid_input} ->
-        IO.puts("入力の形が正しくありません。例: 3 4")
+        IO.puts("入力の形が正しくありません。例: 3 4（マスを開く）、f 3 4（旗を立てる・外す）")
         play(game)
 
       false ->
@@ -79,28 +79,41 @@ defmodule Minesweeper.CLI do
     end
   end
 
+  # 操作の種類（:flag / :reveal）に応じて、Game の関数を呼び分けます。
+  # 引数にアトムを直接書いた関数節で振り分けているので、if は要りません。
+  defp apply_action(game, :flag, position) do
+    Game.toggle_flag(game, position)
+  end
+
+  defp apply_action(game, :reveal, position) do
+    Game.reveal(game, position)
+  end
+
   @doc """
   入力された文字列を解釈します。
 
-  - `"3 4\\n"` のような「整数 空白 整数」なら `{:ok, {3, 4}}`
+  - `"3 4\\n"` のような「整数 空白 整数」なら、マスを開く操作 `{:ok, {:reveal, {3, 4}}}`
+  - `"f 3 4\\n"` のような「f 整数 空白 整数」なら、旗を立てる・外す操作 `{:ok, {:flag, {3, 4}}}`
   - `"q"` なら `:quit`
   - それ以外は `{:error, :invalid_input}`
   """
-  @spec parse_position(String.t()) :: {:ok, Board.position()} | :quit | {:error, :invalid_input}
-  def parse_position(input) do
+  @spec parse_command(String.t()) ::
+          {:ok, {:flag | :reveal, Board.position()}} | :quit | {:error, :invalid_input}
+  def parse_command(input) do
     case String.trim(input) do
       "q" -> :quit
-      trimmed -> parse_numbers(trimmed)
+      "f " <> rest -> parse_numbers(rest, :flag)
+      trimmed -> parse_numbers(trimmed, :reveal)
     end
   end
 
-  # "3 4" のような文字列を {:ok, {3, 4}} にします。形が違えば {:error, :invalid_input} です。
-  defp parse_numbers(trimmed) do
+  # "3 4" のような文字列を {:ok, {action, {3, 4}}} にします。形が違えば {:error, :invalid_input} です。
+  defp parse_numbers(trimmed, action) do
     # Integer.parse/1 は {整数, 残りの文字列} を返します。パターンに "" を書いて、"12a" のような残りがある入力を弾きます。
     with [num, num2] <- String.split(trimmed),
          {x, ""} <- Integer.parse(num),
          {y, ""} <- Integer.parse(num2) do
-      {:ok, {x, y}}
+      {:ok, {action, {x, y}}}
     else
       _error ->
         {:error, :invalid_input}

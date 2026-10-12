@@ -60,6 +60,23 @@ defmodule Minesweeper.Game do
   # Game 以外の値が渡されたら、ごまかさずに FunctionClauseError で落とします（let it crash）。
   def reveal(%__MODULE__{}, _position), do: {:error, :game_finished}
 
+  @doc """
+  座標 `position` のマスのフラグを切り替えます。
+
+  - プレイ中なら `{:ok, 新しいゲーム}` を返します。
+  - すでに終わったゲーム（勝ち・負け）なら `{:error, :game_finished}` を返します。
+  """
+  # reveal/2 と同じく、関数節で status を振り分けて {:ok, _} / {:error, _} を返します。
+  # 旗では勝ち負けは変わらないので、status はそのままにしています。
+  @spec toggle_flag(t(), Board.position()) :: {:ok, t()} | {:error, :game_finished}
+  def toggle_flag(%__MODULE__{status: :playing} = game, position) do
+    board = Board.toggle_flag(game.board, position)
+
+    {:ok, %{game | board: board}}
+  end
+
+  def toggle_flag(%__MODULE__{}, _position), do: {:error, :game_finished}
+
   # 開いた結果から、次のゲームの状態を決めます。
   #
   # `cond` は「上から順に条件を調べて、最初に true になった節を実行する」構文です。

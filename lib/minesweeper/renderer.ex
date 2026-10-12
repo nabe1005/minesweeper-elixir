@@ -13,6 +13,7 @@ defmodule Minesweeper.Renderer do
 
   記号の意味:
   - `#` 閉じているマス
+  - `F` 旗を立てたマス
   - `*` 開いた地雷
   - `.` 開いていて、周囲の地雷が 0 個のマス
   - `1`〜`8` 開いていて、周囲の地雷がその個数のマス
@@ -50,9 +51,11 @@ defmodule Minesweeper.Renderer do
   """
   @spec cell_symbol(Board.t(), Board.position()) :: String.t()
   def cell_symbol(board, position) do
-    # 節は上から順に照合されます。閉じている地雷を "#" と表示するため、:hidden の節を先に置いています。
+    # 節は上から順に照合されます。閉じている地雷や旗を立てた地雷を "*" と表示しないよう、
+    # :hidden と :flagged の節を、地雷の節より先に置いています。
     case board.cells[position] do
       %{state: :hidden} -> "#"
+      %{state: :flagged} -> "F"
       %{mine: true} -> "*"
       _cell -> number_symbol(Board.adjacent_mines(board, position))
     end
