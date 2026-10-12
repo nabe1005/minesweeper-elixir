@@ -12,9 +12,15 @@ defmodule Minesweeper.Game do
   # status は :playing（プレイ中）、:won（勝ち）、:lost（負け）のどれかです。
   defstruct [:board, status: :playing]
 
+  @type status :: :playing | :won | :lost
+
+  # 他のモジュールの型は `モジュール名.型名()` で使えます。alias があるので Board.t() と書けます。
+  @type t :: %__MODULE__{board: Board.t(), status: status()}
+
   @doc """
   盤面 `board` から、プレイ中のゲームを作ります。
   """
+  @spec new(Board.t()) :: t()
   def new(board) do
     %__MODULE__{board: board}
   end
@@ -39,6 +45,9 @@ defmodule Minesweeper.Game do
   # `%__MODULE__{status: :playing} = game` は
   # 「引数が status: :playing の Game 構造体なら一致し、その引数全体を game という名前で受け取る」
   # という意味です。
+  #
+  # 関数節が複数あっても @spec は1つだけ書き、すべての節をまとめた型にします。
+  @spec reveal(t(), Board.position()) :: {:ok, t()} | {:error, :game_finished}
   def reveal(%__MODULE__{status: :playing} = game, position) do
     board = Board.reveal(game.board, position)
 

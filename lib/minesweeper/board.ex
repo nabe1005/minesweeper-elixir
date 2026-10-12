@@ -13,11 +13,40 @@ defmodule Minesweeper.Board do
   # 構造体は %Minesweeper.Board{width: 5, height: 5, cells: %{...}} のように書きます。
   defstruct [:width, :height, :cells]
 
+  # ---- 型の定義 ----
+  # `@type 名前 :: 型` で、型に名前を付けられます（Dart の typedef に近いもの）。
+  # 書いた型は `@spec` の中で `名前()` のように、関数呼び出しの形で使います。
+  # `@spec` も `@type` も実行時には何もチェックしません。ドキュメントと、Dialyzer という静的解析ツール向けです。
+  #
+  # よく使う組み込みの型:
+  #   integer()      整数              non_neg_integer()  0 以上の整数
+  #   pos_integer()  1 以上の整数      boolean()          true か false
+  #   [型]           その型のリスト    %{キーの型 => 値の型}  Map
+  #   {型, 型}       タプル            :atom              そのアトムそのもの
+  #   型A | 型B      A または B（Dart の enum や union のような表現ができます）
+
+  # 座標。盤面の外を表すこともあるので（例: {-1, 0}）、マイナスも許す integer() にしています。
+  @type position :: {integer(), integer()}
+
+  # セル。キーがアトムの Map は、値と同じ形で型を書けます。
+  @type cell :: %{mine: boolean(), state: :hidden | :revealed}
+
+  # `t` は「このモジュールの構造体の型」に付ける、Elixir の慣習的な名前です。
+  # 他のモジュールからは `Minesweeper.Board.t()` と書いて使います。
+  @type t :: %__MODULE__{
+          width: pos_integer(),
+          height: pos_integer(),
+          cells: %{position() => cell()}
+        }
+
   @doc """
   幅 `width`・高さ `height` の盤面を作り、地雷を `mine_count` 個ランダムに配置します。
   """
   # `def` は公開関数、`defp` は非公開関数（Dart の `_` 始まりの名前に相当）です。
   # Elixir の関数は、最後に評価された式が戻り値になります（`return` はありません）。
+  #
+  # `@spec 関数名(引数の型, ...) :: 戻り値の型` で、関数の型を書きます。def の直前に置きます。
+  @spec new(pos_integer(), pos_integer(), non_neg_integer()) :: t()
   def new(width, height, mine_count) do
     positions = all_positions(width, height)
 
@@ -34,6 +63,7 @@ defmodule Minesweeper.Board do
 
   例: `from_mines(3, 3, [{1, 1}])` は真ん中だけに地雷がある 3×3 の盤面を作ります。
   """
+  @spec from_mines(pos_integer(), pos_integer(), [position()]) :: t()
   def from_mines(width, height, mine_positions) do
     cells = build_cells(all_positions(width, height), MapSet.new(mine_positions))
 
@@ -49,6 +79,7 @@ defmodule Minesweeper.Board do
   #
   # パイプ演算子 `|>` は「左の値を、右の関数の第1引数として渡す」という意味です。
   # 下の処理は `Enum.count(neighbors({x, y}), fn ... end)` と同じですが、上から下へ読めます。
+  @spec adjacent_mines(t(), position()) :: non_neg_integer()
   def adjacent_mines(board, {x, y}) do
     {x, y}
     |> neighbors()
@@ -59,7 +90,7 @@ defmodule Minesweeper.Board do
   座標 `position` のマスを開いた、新しい盤面を返します。
 
   - 盤面の外の座標や、すでに開いているマスを指定したときは、盤面をそのまま返します。
-  - 地雷のマスも開きます（ゲームオーバーの判定は後のタスクで作ります）。
+  - 地雷のマスも開きます（勝ち負けの判定は `Minesweeper.Game` が行います）。
   - 開いたマスが地雷ではなく、周囲の地雷が 0 個なら、周囲8マスも自動で開きます。
     開いたマスがまた 0 なら、さらにその周りへと連鎖していきます。
   """
@@ -67,6 +98,7 @@ defmodule Minesweeper.Board do
   # なので reveal は「渡された board を書き換える」のではなく、
   # 「一部だけ違う新しい board を作って返す」関数になります。
   # 呼び出し側は `board = Board.reveal(board, {1, 1})` のように、戻り値を受け取って使います。
+  @spec reveal(t(), position()) :: t()
   def reveal(board, position) do
     # `case` の節には、値だけでなく「形」も書けます。
     # `%{state: :revealed}` は「state キーの値が :revealed であるマップ」に一致します。
@@ -129,6 +161,7 @@ defmodule Minesweeper.Board do
   #
   # `case` は値をパターンで振り分けます（Dart 3 の switch 式に近いものです）。
   # 上から順に照合し、最初に一致した節が実行されます。
+  @spec mine?(t(), position()) :: boolean()
   def mine?(board, position) do
     case Map.get(board.cells, position) do
       nil -> false
@@ -140,6 +173,7 @@ defmodule Minesweeper.Board do
   地雷以外のマスがすべて開いていれば true を返します（＝クリア）。
   """
   # Elixir では、true / false を返す関数の名前に `?` を付ける習慣があります（例: Enum.empty?/1）。
+  @spec cleared?(t()) :: boolean()
   def cleared?(board) do
     # Map を Enum の関数に渡すと、要素は {キー, 値} のタプルになるので、引数でパターンマッチして受け取ります。
     Enum.all?(board.cells, fn {_pos, cell} -> cell.mine or cell.state == :revealed end)
